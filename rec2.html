@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Agenda de Recrutamento - Visualização</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
+      padding: 20px;
+      margin: 0;
+    }
+    h1 {
+      color: #333;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: #fff;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #eee;
+    }
+    .caixa {
+      text-align: center;
+    }
+    a {
+      display: inline-block;
+      margin-top: 20px;
+      text-decoration: none;
+      color: #0077cc;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Agenda de Recrutamento</h1>
+  <p>Esta é a agenda do dia atual. Os horários reservados já estão marcados e visíveis abaixo.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Horário</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="agendaGrid"></tbody>
+  </table>
+
+  <a href="index.html">Voltar para a página principal</a>
+
+  <script>
+    const STORAGE_KEY = 'agendamentos';
+    const STORAGE_DATE_KEY = 'data_agendamento';
+    let agendamentos = {};
+
+    const horarios = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 30) {
+        const hora = String(h).padStart(2, '0');
+        const min = String(m).padStart(2, '0');
+        horarios.push(`${hora}:${min}`);
+      }
+    }
+
+    function carregarEstado() {
+      const salvo = localStorage.getItem(STORAGE_KEY);
+      if (salvo) agendamentos = JSON.parse(salvo);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, s => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      }[s]));
+    }
+
+    function render() {
+      const gridEl = document.getElementById('agendaGrid');
+      gridEl.innerHTML = '';
+      horarios.forEach(h => {
+        const row = document.createElement('tr');
+        const reserva = agendamentos[h];
+
+        const colHorario = document.createElement('td');
+        colHorario.textContent = h;
+
+        const colStatus = document.createElement('td');
+        if (reserva) {
+          colStatus.innerHTML = `<strong>Reservado por:</strong> ${escapeHtml(reserva.recrutador)}${reserva.auxiliador ? ' (Auxiliador: ' + escapeHtml(reserva.auxiliador) + ')' : ''}`;
+        } else {
+          colStatus.textContent = 'Disponível';
+        }
+
+        row.appendChild(colHorario);
+        row.appendChild(colStatus);
+        gridEl.appendChild(row);
+      });
+    }
+
+    (function init() {
+      const dataSalva = localStorage.getItem(STORAGE_DATE_KEY);
+      const hoje = new Date().toISOString().split('T')[0];
+      if (dataSalva !== hoje) {
+        // Se a data mudou, não exibe nada
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.setItem(STORAGE_DATE_KEY, hoje);
+      }
+      carregarEstado();
+      render();
+    })();
+  </script>
+
+</body>
+</html>

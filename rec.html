@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Agendamento Diário</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
+      padding: 20px;
+      margin: 0;
+    }
+    h1 {
+      color: #333;
+    }
+    .controls {
+      margin-bottom: 20px;
+    }
+    label {
+      display: inline-block;
+      margin-right: 10px;
+    }
+    input[type="text"] {
+      padding: 5px;
+      margin-left: 5px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: #fff;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #eee;
+    }
+    .caixa {
+      text-align: center;
+    }
+    .reset-info {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    button {
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    a {
+      display: inline-block;
+      margin-top: 20px;
+      text-decoration: none;
+      color: #0077cc;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Agenda Diária</h1>
+
+  <section class="controls">
+    <label>
+      Recrutador:
+      <input type="text" id="inputRecrutador" placeholder="Nome do recrutador">
+    </label>
+    <label>
+      Auxiliador:
+      <input type="text" id="inputAuxiliador" placeholder="Nome do auxiliador (opcional)">
+    </label>
+    <button id="resetBtn">Limpar Tudo</button>
+    <div class="reset-info" id="resetInfo"></div>
+  </section>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Horário</th>
+        <th>Selecionar</th>
+        <th>Status</th>
+        <th>Ação</th>
+      </tr>
+    </thead>
+    <tbody id="agendaGrid"></tbody>
+  </table>
+
+  <a href="informacoes.html">Ver informações para candidatos</a>
+
+  <script>
+    const STORAGE_KEY = 'agendamentos';
+    const STORAGE_DATE_KEY = 'data_agendamento';
+    let agendamentos = {};
+
+    // Gera horários de 00:00 até 23:30 em intervalos de 30min
+    const horarios = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 30) {
+        const hora = String(h).padStart(2, '0');
+        const min = String(m).padStart(2, '0');
+        horarios.push(`${hora}:${min}`);
+      }
+    }
+
+    function hojeStr() {
+      const hoje = new Date();
+      return hoje.toISOString().split('T')[0];
+    }
+
+    function millisAteMeiaNoite() {
+      const agora = new Date();
+      const meiaNoite = new Date();
+      meiaNoite.setHours(24, 0, 0, 0);
+      return meiaNoite - agora;
+    }
+
+    function carregarEstado() {
+      const salvo = localStorage.getItem(STORAGE_KEY);
+      if (salvo) agendamentos = JSON.parse(salvo);
+    }
+
+    function salvarEstado() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(agendamentos));
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, s => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      }[s]));
+    }
+
+    function render() {
+      const gridEl = document.getElementById('agendaGrid');
+      gridEl.innerHTML = '';
+      horarios.forEach(h => {
+        const row = document.createElement('tr');
+        const reserva = agendamentos[h];
+
+        const colHorario = document.createElement('td');
+        colHorario.textContent = h;
+
+        const colCheck = document.createElement('td');
+        colCheck.className = "caixa";
+
+        const cbHorario = document.createElement('input');
+        cbHorario.type = 'checkbox';
+        cbHorario.checked = !!reserva;
+        cbHorario.disabled = !!reserva;
+        colCheck.appendChild(cbHorario);
+
+        const colStatus = document.createElement('td');
+        if (reserva) {
+          colStatus.innerHTML = `<strong>Reservado por:</strong> ${escapeHtml(reserva.recrutador)}${reserva.auxiliador ? ' (Auxiliador: ' + escapeHtml(reserva.auxiliador) + ')' : ''}`;
+        } else {
+          colStatus.textContent = 'Disponível';
+        }
+
+        const colAcao = document.createElement('td');
+
+        if (!reserva) {
+          const btnSalvar = document.createElement('button');
+          btnSalvar.textContent = 'Salvar';
+          btnSalvar.addEventListener('click', () => {
+            const recrutador = inputRecrutador.value.trim();
+            const auxiliador = inputAuxiliador.value.trim();
+            if (!recrutador) {
+              alert('Digite o nome do recrutador antes de salvar.');
+              return;
+            }
+            if (!cbHorario.checked) {
+              alert('Marque a caixinha do horário.');
+              return;
+            }
+            if (localStorage.getItem(STORAGE_DATE_KEY) !== hojeStr()) {
+              alert('O dia mudou. Recarregando…');
+              location.reload();
+              return;
+            }
+            agendamentos[h] = { recrutador, auxiliador };
+            salvarEstado();
+            render();
+          });
+          colAcao.appendChild(btnSalvar);
+        } else {
+          const btnLimpar = document.createElement('button');
+          btnLimpar.textContent = 'Desmarcar';
+          btnLimpar.addEventListener('click', () => {
+            if (confirm(`Desmarcar o horário ${h}?`)) {
+              delete agendamentos[h];
+              salvarEstado();
+              render();
+            }
+          });
+          colAcao.appendChild(btnLimpar);
+        }
+
+        row.appendChild(colHorario);
+        row.appendChild(colCheck);
+        row.appendChild(colStatus);
+        row.appendChild(colAcao);
+        gridEl.appendChild(row);
+      });
+    }
+
+    function programaResetMeiaNoite() {
+      const ms = millisAteMeiaNoite();
+      setTimeout(() => {
+        agendamentos = {};
+        localStorage.setItem(STORAGE_DATE_KEY, hojeStr());
+        localStorage.removeItem(STORAGE_KEY);
+        location.reload();
+      }, ms + 1000);
+    }
+
+    (function init() {
+      const dataSalva = localStorage.getItem(STORAGE_DATE_KEY);
+      const hoje = hojeStr();
+      if (dataSalva !== hoje) {
+        localStorage.setItem(STORAGE_DATE_KEY, hoje);
+        localStorage.removeItem(STORAGE_KEY);
+      }
+      carregarEstado();
+      render();
+      programaResetMeiaNoite();
+
+      resetBtn.addEventListener('click', () => {
+        if (confirm('Limpar todos os agendamentos de hoje?')) {
+          agendamentos = {};
+          salvarEstado();
+          render();
+        }
+      });
+
+      const resetInfo = document.getElementById('resetInfo');
+      function atualizarContagem() {
+        const ms = millisAteMeiaNoite();
+        const h = Math.floor(ms / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        resetInfo.textContent = h > 0
+          ? `Reinicia à meia-noite em ${h}h ${String(m).padStart(2, '0')}m`
+          : `Reinicia à meia-noite em ${m}m`;
+      }
+      atualizarContagem();
+      setInterval(atualizarContagem, 60000);
+    })();
+  </script>
+
+</body>
+</html>
